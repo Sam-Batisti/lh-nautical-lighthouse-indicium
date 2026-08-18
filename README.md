@@ -131,6 +131,36 @@ O painel em Power BI está em `dashboard/Dashboard.pbix`, conectado direto no Po
 - **Visão de Produtos** (âmbar): rentabilidade, reembolso e faturamento x margem. Filtro de Categoria.
 - **Visão de Demanda** (lilás): venda média por dia da semana e previsão x real da Bússola de Bordo 702. Filtro de Ano, que só afeta a previsão. O gráfico de dia da semana é uma média fixa do período todo e não tem coluna de data pra filtrar.
 
+**Visão Executiva**
+![Visão Executiva](dashboard/prints/dashboard_executiva.png)
+
+**Visão de Clientes**
+![Visão de Clientes](dashboard/prints/dashboard_clientes.png)
+
+**Visão de Produtos**
+![Visão de Produtos](dashboard/prints/dashboard_produtos.png)
+
+**Visão de Demanda**
+![Visão de Demanda](dashboard/prints/dashboard_demanda.png)
+
+## Uso de Inteligência Artificial
+
+A Inteligência Artificial foi utilizada como ferramenta de apoio durante o desenvolvimento deste projeto, principalmente para explorar alternativas de implementação, revisar código, discutir decisões técnicas e melhorar a documentação.
+
+As sugestões geradas foram testadas e validadas no ambiente do projeto antes de serem incorporadas. Os resultados apresentados no projeto foram conferidos diretamente nos dados, no PostgreSQL e nas execuções dos scripts.
+
+O uso de IA teve como objetivo acelerar o desenvolvimento e ampliar a exploração de soluções, sem substituir a análise, a validação ou as decisões técnicas.
+
+### Como utilizei IA neste projeto
+
+| Uso | Exemplo |
+| --- | --- |
+| Exploração de soluções | Comparação entre diferentes abordagens para SQL, Python e modelagem |
+| Revisão de código | Identificação de problemas, simplificação e melhoria de legibilidade |
+| Validação de raciocínio | Discussão sobre outliers, regras de negócio e possíveis data leakage |
+| Documentação | Apoio para tornar explicações técnicas mais claras |
+| Desenvolvimento | Geração de rascunhos de código que foram executados, revisados e ajustados |
+
 ## Como rodar
 
 1. Instalar as dependências: `pip install -r requirements.txt`
