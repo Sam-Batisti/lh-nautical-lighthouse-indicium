@@ -121,7 +121,7 @@ Dá suporte à página de Demanda. Essas duas views não inventam regra nova, s�
 
 ## Dashboard
 
-🔗 **[Ver o dashboard ao vivo](https://app.powerbi.com/view?r=eyJrIjoiNzZmZWZmNGUtOWQ2YS00NGZlLWE4NTUtMTJkNjM5ZGU0OGFhIiwidCI6IjY1MDZiNzgwLTU4NTEtNGY0Ny04NTI5LWExMTEwN2VkYTdlMSJ9)**
+🔗 **[Ver o dashboard online](https://app.powerbi.com/view?r=eyJrIjoiNzZmZWZmNGUtOWQ2YS00NGZlLWE4NTUtMTJkNjM5ZGU0OGFhIiwidCI6IjY1MDZiNzgwLTU4NTEtNGY0Ny04NTI5LWExMTEwN2VkYTdlMSJ9)**
 
 O painel em Power BI está em `dashboard/Dashboard.pbix`, conectado direto no PostgreSQL. Tem 5 páginas: uma Capa e 4 páginas de dado, cada uma com uma cor pra ajudar na localização.
 
