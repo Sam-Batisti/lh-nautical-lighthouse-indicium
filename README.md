@@ -1,12 +1,12 @@
 # LH Nautical — Desafio de Dados
 
-Case técnico feito pra um processo de bolsa: pegar os dados brutos de uma loja náutica fictícia (a LH Nautical) e ir do zero até um dashboard, passando por SQL, Python e Power BI.
+Case técnico feito pra o Lighthouse da empresa Indicium AI,o desafio foi receber os dados brutos de uma loja náutica fictícia (a LH Nautical) e ir do zero até um dashboard, passando por SQL, Python e Power BI.
 
 ## Sobre o projeto
 
 A LH Nautical vende produto náutico em loja física, e-commerce e armazém. Os dados vêm em 24 CSVs soltos — pedidos, clientes, estoque, nota fiscal, devolução, etc. O desafio pedia pra eu ir do dado cru até uma análise que faça sentido pra decisão de negócio: entender a qualidade dos dados, montar um banco relacional, responder perguntas de vendas e clientes, fazer uma previsão simples de demanda, montar uma recomendação de produto e fechar tudo num painel.
 
-Tentei documentar não só o resultado, mas o porquê de cada decisão — que filtro usei, o que fazer quando o dado tava ambíguo, e por que escolhi um jeito e não outro. Isso importa mais pra mim do que só "bater o número certo".
+Tentei documentar não só o resultado, mas o porquê de cada decisão — que filtro usei, o que fazer quando o dado tava ambíguo, e por que escolhi um jeito e não outro. Isso importa mais do que só "bater o número certo".
 
 ## Stack
 
@@ -121,17 +121,15 @@ Dá suporte à página de Demanda. Essas duas views não inventam regra nova —
 
 ## Dashboard
 
-🔗 **[Ver o dashboard ao vivo](https://app.powerbi.com/view?r=eyJrIjoiNzZmZWZmNGUtOWQ2YS00NGZlLWE4NTUtMTJkNjM5ZGU0OGFhIiwidCI6IjY1MDZiNzgwLTU4NTEtNGY0Ny04NTI5LWExMTEwN2VkYTdlMSJ9)** — link público, dá pra abrir e navegar sem precisar de login.
+🔗 **[Ver o dashboard ao vivo](https://app.powerbi.com/view?r=eyJrIjoiNzZmZWZmNGUtOWQ2YS00NGZlLWE4NTUtMTJkNjM5ZGU0OGFhIiwidCI6IjY1MDZiNzgwLTU4NTEtNGY0Ny04NTI5LWExMTEwN2VkYTdlMSJ9)**
 
-O painel em Power BI tá em `dashboard/Dashboard.pbix`, conectado direto no PostgreSQL. Tem 5 páginas: uma Capa e 4 páginas de dado, cada uma com uma cor pra ajudar a se localizar.
+O painel em Power BI está em `dashboard/Dashboard.pbix`, conectado direto no PostgreSQL. Tem 5 páginas: uma Capa e 4 páginas de dado, cada uma com uma cor pra ajudar na localização.
 
 - **Capa** — atalho pra cada uma das 4 páginas.
 - **Visão Executiva** (azul) — faturamento, vendas e KPIs gerais. Filtros de Ano, Canal e Categoria.
 - **Visão de Clientes** (verde) — ticket médio, diversidade de categoria e clientes elite (Questão 4). Sem filtro de categoria de propósito: os 3 gráficos dessa página olham o histórico completo do cliente, então filtrar por categoria não faria sentido igual nos três.
 - **Visão de Produtos** (âmbar) — rentabilidade, reembolso e faturamento x margem. Filtro de Categoria.
 - **Visão de Demanda** (lilás) — venda média por dia da semana e previsão x real da Bússola de Bordo 702. Filtro de Ano, que só afeta a previsão — o gráfico de dia da semana é uma média fixa do período todo e não tem coluna de data pra filtrar.
-
-Navegação: menu lateral fixo em toda página, com atalho pra Capa e pras 4 páginas, botão de Anterior/Próxima (seguindo Capa → Executiva → Clientes → Produtos → Demanda, sem "Próxima" na última) e um botão de reset por página.
 
 ## Como rodar
 
