@@ -1,12 +1,12 @@
-# LH Nautical | From Data to Decisions
+# LH Nautical — Desafio de Dados
 
-An end-to-end analytics case covering data quality, SQL, analytics engineering, forecasting and recommendation.
+Case técnico feito pra um processo de bolsa: pegar os dados brutos de uma loja náutica fictícia (a LH Nautical) e ir do zero até um dashboard, passando por SQL, Python e Power BI.
 
 ## Sobre o projeto
 
-Este repositório documenta a resolução de um case técnico de dados para a LH Nautical, empresa fictícia de varejo náutico com lojas físicas, armazéns e e-commerce. O case cobre o ciclo completo de trabalho com dados: exploração e qualidade dos dados brutos, modelagem e carga em banco relacional, análise de clientes, dimensão de calendário, previsão de demanda e sistema de recomendação.
+A LH Nautical vende produto náutico em loja física, e-commerce e armazém. Os dados vêm em 24 CSVs soltos — pedidos, clientes, estoque, nota fiscal, devolução, etc. O desafio pedia pra eu ir do dado cru até uma análise que faça sentido pra decisão de negócio: entender a qualidade dos dados, montar um banco relacional, responder perguntas de vendas e clientes, fazer uma previsão simples de demanda, montar uma recomendação de produto e fechar tudo num painel.
 
-O critério orientador do projeto não foi só chegar ao número certo, mas documentar a decisão por trás de cada escolha metodológica — filtros aplicados, tratamento de ambiguidade nos dados e trade-offs de cada abordagem.
+Tentei documentar não só o resultado, mas o porquê de cada decisão — que filtro usei, o que fazer quando o dado tava ambíguo, e por que escolhi um jeito e não outro. Isso importa mais pra mim do que só "bater o número certo".
 
 ## Stack
 
@@ -35,108 +35,110 @@ LH-Nautical-Data-Challenge/
 └── requirements.txt
 ```
 
-## Questões obrigatórias e principais achados
+## As questões do desafio e o que encontrei
 
 ### Questão 1 — EDA (`scripts/01_eda_orders.py`, `sql/01_eda_orders.sql`)
 
-Análise exploratória da tabela `orders`, sem qualquer tratamento, para diagnosticar se os dados são confiáveis para decisão.
+Primeiro passo: olhar a tabela `orders` sem mexer em nada, só pra ver se dá pra confiar nesse dado.
 
 - 48.998 linhas, 13 colunas, período de 2020-01-01 a 2026-12-31
 - Coluna `total`: mínimo 32,62, máximo 127.262,02, média 28.704,99
-- 452 outliers pela regra de IQR (0,92% das linhas), 8,82% das linhas com data futura em relação à referência da análise, e 49,25% de nulos em `salesperson_id`
-- Diagnóstico: a base é utilizável, mas não está pronta para decisão sem tratamento prévio — datas futuras e o volume de nulos em `salesperson_id` precisam ser investigados antes de qualquer análise operacional.
+- 452 outliers pela regra do IQR (0,92% das linhas), 8,82% das linhas com data no futuro, e quase metade (49,25%) de `salesperson_id` vazio
+- Conclusão: dá pra usar, mas não tá pronto pra decisão sem tratar antes — as datas futuras e o tanto de `salesperson_id` vazio precisam ser investigados primeiro.
 
 ### Questão 2 — Schema (`scripts/02_generate_schema.py`, `sql/schema.sql`)
 
-Gerador de DDL PostgreSQL em Python 3 puro (só biblioteca padrão), com inferência de tipo por coluna a partir dos 24 CSVs. Trata casos de borda como identificadores com zero à esquerda (CPF, telefone) e chaves de acesso de NF-e com 44 dígitos que estourariam `BIGINT`.
+Fiz um script em Python puro (sem biblioteca externa) que lê os 24 CSVs e gera o DDL do PostgreSQL sozinho, adivinhando o tipo de cada coluna. Precisei tratar dois casos que dariam problema: CPF e telefone que começam com zero (se virar número, perde o zero) e a chave de acesso da nota fiscal, que tem 44 dígitos e não cabe num `BIGINT`.
 
 ### Questão 3 — Carregamento (`scripts/03_load_data.py`)
 
-Carga bruta dos 24 CSVs no PostgreSQL via `COPY ... FROM STDIN`, sem transformação — cada valor entra exatamente como está no arquivo original.
+Carga bruta dos 24 CSVs pro PostgreSQL, usando `COPY ... FROM STDIN` — sem tratar nada, cada valor entra exatamente como tá no arquivo original.
 
 ### Questão 4 — Análise de clientes (`sql/04_clientes_fieis.sql`)
 
-Ranking dos 10 clientes fiéis com maior ticket médio, entre os que compraram de 13 ou mais categorias distintas, e a categoria mais comprada por esse grupo.
+Rankear os 10 clientes fiéis com maior ticket médio, considerando fiel quem comprou de 13 categorias diferentes ou mais, e ver qual categoria esse grupo mais compra.
 
-- Todos os 10 clientes fiéis compraram das 14 categorias existentes no catálogo
-- Categoria mais comprada pelo grupo: Hélices (492 unidades), à frente de Coletes Salva-Vidas (393) e Eletrônica Náutica (392)
+- Os 10 clientes fiéis compraram das 14 categorias que existem no catálogo — todas elas
+- Categoria mais comprada pelo grupo: Hélices (492 unidades), na frente de Coletes Salva-Vidas (393) e Eletrônica Náutica (392)
 
 ### Questão 5 — Dimensão de calendário (`sql/05_dimensao_calendario.sql`)
 
-Construção de uma tabela de datas via `generate_series` para calcular a venda média diária por dia da semana no canal físico (pos), incluindo dias sem nenhuma venda registrada como zero.
+Montei uma tabela de datas com `generate_series` pra calcular a venda média diária por dia da semana, só do canal de loja física (pos), contando os dias sem venda nenhuma como zero.
 
-- Sem a dimensão de calendário, dias sem venda somem do cálculo em vez de contar como zero, o que infla artificialmente a média.
-- Com o tratamento correto, quinta-feira é o pior dia de vendas (R$ 157.154,32 de média diária), não domingo como a leitura ingênua sugeria.
+- Sem essa tabela de calendário, dia sem venda simplesmente some do cálculo em vez de entrar como zero — e isso infla a média sem eu perceber.
+- Corrigindo isso, quinta-feira é o pior dia de vendas (R$ 157.154,32 de média), não domingo como parecia numa primeira olhada.
 
 ### Questão 6 — Previsão de demanda (`scripts/06_previsao_demanda.py`)
 
-Baseline de média móvel de 3 meses (walk-forward) para prever as vendas mensais de "Bússola de Bordo 702" no primeiro trimestre de 2026, considerando pedidos com status `paid` e `confirmed`.
+Usei uma média móvel de 3 meses (olhando só pro passado, sem trapacear com dado futuro) pra prever a venda mensal da "Bússola de Bordo 702" no primeiro trimestre de 2026, considerando só pedido com status `paid` ou `confirmed`.
 
-- Achado de qualidade de dados: existem 2 linhas de produto cadastradas com o mesmo nome ("Bússola de Bordo 702", ids 74 e 240) — nome não é chave única no catálogo. As 3 variantes das 2 linhas foram usadas em conjunto após confirmar que ambas têm histórico de venda real.
-- MAE de 16,56 unidades no trimestre de teste. O erro concentra-se em janeiro (43,33 unidades) — o modelo não antecipa mudança brusca de patamar de demanda, o que na prática geraria ruptura de estoque.
+- Achado no caminho: existem 2 cadastros de produto com o mesmo nome "Bússola de Bordo 702" (ids 74 e 240) — ou seja, nome não é uma chave única no catálogo. Usei as 3 variantes dos dois cadastros juntas, depois de confirmar que as duas têm venda de verdade.
+- O erro médio (MAE) ficou em 16,56 unidades no trimestre de teste, mas concentrado em janeiro (43,33 unidades) — o modelo não pega mudança brusca de demanda, o que na prática significaria faltar produto no estoque.
 
 ### Questão 7 — Sistema de recomendação (`scripts/07_recomendacao.py`)
 
-Matriz binária cliente x produto (presença de compra, pedidos `paid`/`confirmed`) e similaridade de cosseno entre produtos, para recomendar itens complementares ao "Motor de Popa 1949".
+Montei uma matriz simples de cliente x produto (1 se o cliente comprou, 0 se não comprou) e calculei a similaridade de cosseno entre produtos, pra sugerir o que costuma ser comprado junto com o "Motor de Popa 1949".
 
-- Produto mais similar: Vela Mestra 1913 (similaridade 0,2452)
-- Nenhuma "Defensa Náutica" aparece no top 5, apesar da hipótese de negócio inicial — o catálogo tem cerca de 44 SKUs distintos de defensa, o que dilui a similaridade calculada por produto individual.
+- Produto mais parecido: Vela Mestra 1913, com similaridade de 0,2452
+- A "Defensa Náutica" não apareceu entre os 5 primeiros, mesmo com a expectativa inicial de que apareceria — mas isso pode ser porque o catálogo tem uns 44 SKUs diferentes de defensa, o que espalha (dilui) a similaridade entre vários produtos em vez de concentrar num só.
 
-## Análise complementar (`sql/08_prejuizo_margem.sql`)
+## Extras que criei pra sustentar o dashboard
 
-O enunciado sugere "ranking de prejuízos por produto" e "clientes com maior lucro acumulado" como visuais do dashboard, sem premissas formais para essa análise — por isso ela não é uma questão numerada do desafio, e sim um insumo complementar construído especificamente para sustentar o Power BI com números validados.
+Essas análises não são questão numerada do desafio — o enunciado só sugeria alguns gráficos pro painel ("ranking de prejuízo", "clientes com mais lucro") sem dar uma regra exata de como calcular. Então criei essa lógica eu mesma e documentei em SQL, pra não jogar um número no dashboard sem saber de onde ele veio.
 
-Evitei os termos "prejuízo" e "lucro" sem qualificar, porque nenhum dos dois é exato com os dados disponíveis: o valor devolvido não é necessariamente prejuízo líquido (o item pode voltar ao estoque e ser revendido), e a diferença entre preço de venda e custo cadastrado não é lucro contábil (não desconta imposto, frete ou custo operacional). A lógica está documentada e validada em três views no PostgreSQL:
+### `sql/08_prejuizo_margem.sql`
 
-- `valor_reembolsado_por_produto`: soma do valor efetivamente reembolsado ao cliente, só em devoluções concluídas (`completed`) e de ação `refund` (troca não devolve dinheiro). Top: Bússola de Bordo 8282, R$ 58.380,75.
-- `margem_estimada_por_produto`: `sale_price - cost_price` por variante, média por produto. Margem média geral de 41,3%.
-- `margem_acumulada_por_cliente`: soma da margem estimada de todos os itens comprados por cliente, mesmo filtro `paid`/`confirmed` usado nas Questões 6 e 7. Cliente 740 lidera com R$ 529.657,42.
+Evitei falar "prejuízo" e "lucro" sem qualificar, porque nenhum dos dois é exato com o que eu tenho: o valor devolvido não é prejuízo líquido de verdade (o produto pode voltar pro estoque e ser vendido de novo), e a diferença entre preço de venda e custo não é lucro contábil (não desconta imposto, frete, etc). Por isso uso os termos "valor reembolsado" e "margem estimada".
 
-## Análise complementar (`sql/09_dashboard_clientes.sql`)
+- `valor_reembolsado_por_produto`: soma do valor devolvido de fato, só em devolução concluída (`completed`) e do tipo `refund` (troca não devolve dinheiro). O topo é Bússola de Bordo 8282, com R$ 58.380,75.
+- `margem_estimada_por_produto`: preço de venda menos custo, por variante, com a média por produto. A margem média geral deu 41,3%.
+- `margem_acumulada_por_cliente`: soma da margem de tudo que cada cliente comprou, com o mesmo filtro de pedido válido das questões 6 e 7. O cliente 740 lidera com R$ 529.657,42.
 
-Suporte à página "Clientes" do dashboard. "Cliente elite" segue a definição literal da Questão 4 — diversidade de categorias compradas ≥ 13. Como o catálogo tem só 14 categorias no total, esse corte sozinho classifica 96% da base como elite, então o gráfico de categoria mais consumida restringe ao Top 10 desses clientes elite ordenados por ticket médio, mantendo a definição do enunciado e ainda assim segmentando algo relevante.
+### `sql/09_dashboard_clientes.sql`
 
-- `ticket_medio_por_cliente`: ticket médio e quantidade de pedidos por cliente, filtro `paid`/`confirmed`.
-- `diversidade_categorias_por_cliente`: quantidade de categorias distintas compradas por cliente e flag `cliente_elite` (≥ 13).
-- `consumo_categorias_clientes_elite`: quantidade de itens comprados por categoria, entre o Top 10 clientes elite por ticket médio. Categoria líder: Pesca (344 itens).
+Dá suporte à página de Clientes do dashboard. Usei a mesma definição de "cliente elite" da Questão 4 (diversidade de categoria ≥ 13). Só que como o catálogo tem só 14 categorias no total, esse corte sozinho já pega 96% dos clientes — então o gráfico de categoria mais consumida restringe pro Top 10 desses clientes elite por ticket médio, pra ainda sobrar algo útil de olhar.
 
-## Análise complementar (`sql/10_dashboard_produtos.sql`)
+- `ticket_medio_por_cliente`: ticket médio e número de pedidos por cliente.
+- `diversidade_categorias_por_cliente`: quantas categorias diferentes cada cliente comprou, e uma flag `cliente_elite`.
+- `consumo_categorias_clientes_elite`: quantidade comprada por categoria, olhando só o Top 10 elite. Categoria que mais aparece: Pesca (344 itens).
 
-Suporte à página "Produtos e Rentabilidade" do dashboard. Ao montar essa página, encontrei um problema de qualidade de dado: o catálogo tem produtos com nome duplicado/placeholder — `"asdf"` aparece em dois `product_id` diferentes (187 e 342, categorias diferentes), e `"TBD"` também existe como nome de produto (id 66). As views da análise 08 agrupam por `p.name`, então esses dois "asdf" ficam somados numa linha só — não distorceu a Questão 4, mas nas análises por produto do dashboard isso juntaria dois produtos reais e diferentes numa barra só (cheguei a ver "asdf" aparecer em #1 no ranking de faturamento, R$ 8,28 Mi, antes da correção).
+### `sql/10_dashboard_produtos.sql`
 
-Decisão: não excluí `"asdf"`/`"TBD"` do catálogo — são dados brutos e não há premissa que justifique remover. Em vez disso, as views abaixo sempre agrupam por `product_id` (nunca por nome), e uma coluna `nome_produto` no formato `<nome> | ID <id>` deixa visível quando dois produtos compartilham nome, em vez de esconder o problema.
+Dá suporte à página de Produtos. Enquanto montava essa página encontrei um problema: tem produto com nome repetido ou tipo "rascunho" no catálogo — "asdf" aparece em dois `product_id` diferentes (187 e 342, de categorias diferentes), e "TBD" também é nome de produto (id 66). As views da Questão 8 agrupam por nome, então esses dois "asdf" ficam somados numa linha só. Isso não bagunçou a Questão 4, mas nessa página do dashboard chegou a aparecer "asdf" em #1 do ranking de faturamento (R$ 8,28 Mi) antes de eu corrigir.
 
-- `ranking_valor_reembolsado_produto`: valor reembolsado por produto, agrupado por `product_id`. Líder: Bússola de Bordo 8282 (ID 449), R$ 58.380,75 — mesmo número da view 08, confirma que essa categoria específica não tinha colisão de nome.
-- `margem_estimada_por_categoria`: margem estimada média por categoria (`product_variants` → `products` → `categories`). Categoria com menor margem: Pesca (39,2%).
-- `faturamento_margem_por_produto`: faturamento total e margem estimada por produto, mesma chave `product_id`, usada tanto no gráfico de dispersão (faturamento × margem) quanto no ranking de faturamento. Após corrigir o agrupamento, os dois produtos "asdf" aparecem separados (R$ 4,85 Mi e R$ 3,44 Mi) e o líder real passa a ser Bateria Náutica 5523 (ID 258), R$ 7,10 Mi.
+Decidi não apagar "asdf"/"TBD" do catálogo — é dado bruto e não tinha motivo pra remover. Em vez disso, essas views sempre agrupam por `product_id` (nunca por nome), e criei uma coluna `nome_produto` no formato "nome | ID x" pra deixar visível quando dois produtos dividem o mesmo nome, em vez de esconder isso.
 
-## Análise complementar (`sql/11_dashboard_demanda.sql`)
+- `ranking_valor_reembolsado_produto`: valor reembolsado por produto, agora por id. O líder é o mesmo da Questão 8 (Bússola de Bordo 8282), confirmando que esse produto não tinha o problema de nome repetido.
+- `margem_estimada_por_categoria`: margem média por categoria. A categoria com menor margem é Pesca (39,2%).
+- `faturamento_margem_por_produto`: faturamento e margem por produto, usada tanto no gráfico de faturamento x margem quanto no ranking. Depois de corrigir o agrupamento, os dois "asdf" aparecem separados (R$ 4,85 Mi e R$ 3,44 Mi), e o líder de verdade passa a ser Bateria Náutica 5523, com R$ 7,10 Mi.
 
-Suporte à página "Demanda e Operação" do dashboard. As duas views abaixo não criam regra nova — empacotam como view a mesma lógica já validada na Questão 6 (`sql/05_dimensao_calendario.sql` e `scripts/06_previsao_demanda.py`), que antes eram só consulta solta / script Python, não consultáveis pelo Power BI.
+### `sql/11_dashboard_demanda.sql`
 
-- `vendas_dia_semana`: mesma lógica exata do `05_dimensao_calendario.sql` (canal POS, dias sem venda entram como zero na média). Pior dia: Quinta-feira.
-- `previsao_bussola_702`: série mensal completa (2020-01 a 2026-03) da Bússola de Bordo 702, com `qtd_prevista` e `erro_absoluto` preenchidos só no período de teste oficial (jan-mar/2026) — não inventei previsão pra meses que o script original não avaliou. Validei em SQL (DuckDB) contra a saída do script: bate exatamente (jan 32,67/76, fev 49,67/55, mar 50,00/51, MAE 16,55).
+Dá suporte à página de Demanda. Essas duas views não inventam regra nova — só pegam a mesma lógica da Questão 5 e da Questão 6 e transformam em view, pra dar pra consultar direto do Power BI (antes era só script Python / consulta solta).
+
+- `vendas_dia_semana`: mesma lógica da Questão 5. Pior dia continua sendo quinta-feira.
+- `previsao_bussola_702`: série mensal completa (jan/2020 a mar/2026) da Bússola de Bordo 702, com previsão e erro preenchidos só no período de teste oficial (jan-mar/2026) — não inventei previsão pra mês que o script original não avaliou. Conferi em SQL contra a saída do script Python e bateu certinho (jan 32,67/76, fev 49,67/55, mar 50,00/51, MAE 16,55).
 
 ## Dashboard
 
-O painel complementar em Power BI está em `dashboard/Dashboard.pbix`, conectado direto no PostgreSQL. Tem 5 páginas: uma Capa e 4 páginas de dados, cada uma com uma cor de destaque própria pra facilitar a orientação visual.
+O painel em Power BI tá em `dashboard/Dashboard.pbix`, conectado direto no PostgreSQL. Tem 5 páginas: uma Capa e 4 páginas de dado, cada uma com uma cor pra ajudar a se localizar.
 
-- **Capa** — abertura do painel, com atalho direto pra cada uma das 4 páginas.
-- **Visão Executiva** (azul-aço) — faturamento, vendas e KPIs gerais. Filtros: Ano, Canal, Categoria.
-- **Visão de Clientes** (verde-água) — ticket médio, diversidade de categorias e "clientes elite" (Questão 4). Sem filtro de categoria: os 3 gráficos dessa página trabalham no grão cliente (histórico de todos os pedidos), então um recorte por categoria não se aplicaria de forma consistente entre eles.
-- **Visão de Produtos** (âmbar) — rentabilidade, ranking de reembolso e faturamento × margem (`sql/10_dashboard_produtos.sql`). Filtro: Categoria.
-- **Visão de Demanda** (lilás) — vendas médias por dia da semana (Questão 6) e previsão × real da Bússola de Bordo 702 (`sql/11_dashboard_demanda.sql`). Filtro: Ano — afeta a série de previsão; o gráfico de dia da semana é uma média fixa do período completo e não tem coluna de data, então não responde ao filtro por desenho.
+- **Capa** — atalho pra cada uma das 4 páginas.
+- **Visão Executiva** (azul) — faturamento, vendas e KPIs gerais. Filtros de Ano, Canal e Categoria.
+- **Visão de Clientes** (verde) — ticket médio, diversidade de categoria e clientes elite (Questão 4). Sem filtro de categoria de propósito: os 3 gráficos dessa página olham o histórico completo do cliente, então filtrar por categoria não faria sentido igual nos três.
+- **Visão de Produtos** (âmbar) — rentabilidade, reembolso e faturamento x margem. Filtro de Categoria.
+- **Visão de Demanda** (lilás) — venda média por dia da semana e previsão x real da Bússola de Bordo 702. Filtro de Ano, que só afeta a previsão — o gráfico de dia da semana é uma média fixa do período todo e não tem coluna de data pra filtrar.
 
-Navegação: barra lateral fixa em todas as páginas, com atalho para a Capa, para cada uma das 4 páginas, botões Anterior/Próxima (seguindo a sequência Capa → Executiva → Clientes → Produtos → Demanda, sem "Próxima" na última página) e um botão de reset visual por página.
+Navegação: menu lateral fixo em toda página, com atalho pra Capa e pras 4 páginas, botão de Anterior/Próxima (seguindo Capa → Executiva → Clientes → Produtos → Demanda, sem "Próxima" na última) e um botão de reset por página.
 
 ## Como rodar
 
 1. Instalar as dependências: `pip install -r requirements.txt`
 2. Ajustar os caminhos dos CSVs e as credenciais do PostgreSQL no início de cada script/arquivo SQL
 3. Rodar os scripts na ordem numérica (`scripts/01_...` até `scripts/07_...`)
-4. Rodar `sql/08_prejuizo_margem.sql`, `sql/09_dashboard_clientes.sql`, `sql/10_dashboard_produtos.sql` e `sql/11_dashboard_demanda.sql` para criar as views de apoio ao dashboard
-5. No Power BI, conectar direto no PostgreSQL (banco `lh_nautical`) e selecionar as tabelas/views no Navigator — inclusive as 11 views das análises complementares, que aparecem como tabela normal
+4. Rodar `sql/08_prejuizo_margem.sql`, `sql/09_dashboard_clientes.sql`, `sql/10_dashboard_produtos.sql` e `sql/11_dashboard_demanda.sql` pra criar as views que sustentam o dashboard
+5. No Power BI, conectar direto no PostgreSQL (banco `lh_nautical`) e selecionar as tabelas/views no Navigator — as 11 views das análises extras aparecem lá como tabela normal
 
-## Nota sobre os dados
+## Sobre os dados
 
-Os dados utilizados neste projeto foram fornecidos exclusivamente para o desafio técnico da LH Nautical e não estão publicados neste repositório.
+Os dados desse projeto foram fornecidos só pra esse desafio técnico da LH Nautical e não estão publicados neste repositório.
